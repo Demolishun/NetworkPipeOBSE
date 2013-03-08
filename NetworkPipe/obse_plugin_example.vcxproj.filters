@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="obse">
+      <UniqueIdentifier>{52f98d73-ea85-4feb-94a1-3153962aca75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs">
+      <UniqueIdentifier>{4caa1358-d91e-4982-9582-81f4a843d3af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\json source">
+      <UniqueIdentifier>{fae5ce39-1ba1-420e-853e-91f160d68b24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NoCompile">
+      <UniqueIdentifier>{db60c89c-d94c-4c32-b86a-7505beb877bc}</UniqueIdentifier>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\obse\obse\GameActorValues.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameAPI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameBSExtraData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameExtraData.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameForms.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameObjects.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameTasks.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\GameTypes.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiAPI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiNodes.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\NiRTTI.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\Script.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\Utilities.cpp">
+      <Filter>obse</Filter>
+    </ClCompile>
+    <ClCompile Include="dllmain.c" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="main_bak.cpp" />
+    <ClCompile Include="..\json\Source\internalJSONNode.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONAllocator.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONChildren.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONDebug.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONIterators.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONMemory.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONNode.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONNode_Mutex.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONPreparse.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONStream.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONValidator.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONWorker.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\JSONWriter.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\json\Source\libjson.cpp">
+      <Filter>libs\json source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\Commands_General.cpp">
+      <Filter>NoCompile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\obse\obse\ArrayVar.cpp">
+      <Filter>NoCompile</Filter>
+    </ClCompile>
+    <ClCompile Include="NetworkPipe.cpp" />
+    <ClCompile Include="parse_json.cpp" />
+    <ClCompile Include="unicode_conv.cpp" />
+    <ClCompile Include="obse_helper.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\obse\obse\GameActorValues.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameBSExtraData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameExtraData.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameForms.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameObjects.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameTasks.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\GameTypes.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiNodes.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiRTTI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\ParamInfos.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\PluginAPI.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\Script.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\Utilities.h">
+      <Filter>obse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\libjson.h">
+      <Filter>libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\JSONOptions.h">
+      <Filter>libs</Filter>
+    </ClInclude>
+    <ClInclude Include="concurrent_queue.h" />
+    <ClInclude Include="..\json\Source\internalJSONNode.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSON_Base64.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONAllocator.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONChildren.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONDebug.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONDefs.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONGlobals.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONMemory.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONMemoryPool.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONNode.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONPreparse.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONSharedString.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONSingleton.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONStream.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONValidator.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\JSONWorker.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json\Source\NumberToString.h">
+      <Filter>libs\json source</Filter>
+    </ClInclude>
+    <ClInclude Include="parse_json.h" />
+    <ClInclude Include="..\obse\obse\ArrayVar.h">
+      <Filter>NoCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\Commands_General.h">
+      <Filter>NoCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\ScriptUtils.h">
+      <Filter>NoCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="unicode_conv.h" />
+    <ClInclude Include="NetworkPipe.h" />
+    <ClInclude Include="static_callbacks.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\obse\obse\GameRTTI_1_1.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="..\obse\obse\GameRTTI_1_2.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="..\obse\obse\GameRTTI_1_2_416.inl">
+      <Filter>obse</Filter>
+    </None>
+    <None Include="exports.def" />
+  </ItemGroup>
+</Project>
