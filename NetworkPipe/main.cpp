@@ -18,6 +18,7 @@ Todo:
 
 #include "NetworkPipe.h"
 #include "static_callbacks.h"
+#include "obse/PluginAPI.h"
 
 /*
 Control plugin.  Controls conversion of data received.
@@ -281,12 +282,99 @@ bool Cmd_NetworkPipe_Receive_Execute(COMMAND_ARGS)
                 }
             }
 		}
-        OBSEArray* arr = g_arrayIntfc->CreateStringMap(NULL, NULL, 0, scriptObj);
-        // return the empty array
-        g_arrayIntfc->AssignCommandResult(arr, result);
-	}    
+        
+	}   
+    
+    OBSEArray* arr = g_arrayIntfc->CreateStringMap(NULL, NULL, 0, scriptObj);
+    // return the empty array
+    g_arrayIntfc->AssignCommandResult(arr, result);
 
 	return true;
+}
+// sends data to a client or broadcasts to all known clients
+// requires IP and PORT to send to client, if none then it will broadcast
+// returns a stringmap for status
+bool Cmd_NetworkPipe_Send_Execute(COMMAND_ARGS){
+    if(!g_Interface->isEditor){
+        // do not use data until we enable it
+        if(NetworkPipeEnable){
+            // get data from array
+            UInt32 arrID = 0;
+            if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, &arrID)){
+                // get array
+                OBSEArray* arr = g_arrayIntfc->LookupArrayByID(arrID);
+		        if (arr) {
+                    JSONNode n; 
+                    OBSEElement root("root");                    
+                                        
+                    BuildJSON(n, arr, root);
+
+                    JSONNode::const_iterator itr = n.find(UniConv::get_wstring("root"));
+                    JSONNode::const_iterator itr_add = itr->find(UniConv::get_wstring("address:port"));
+                    /*
+                    udp_packet temp_packet;
+                    udp_buffer temp_buffer;
+                    std::string tmpStr;
+                    std::stringstream tmpStream;
+                    tmpStream << UniConv::get_string(itr->write()).c_str();
+                    tmpStream >> temp_buffer.c_array();
+                    temp_packet[UniConv::get_string(itr_add->as_string())] = temp_buffer;
+		            udp_output_queue.push(temp_packet);
+                    */
+                    
+                    Console_Print(UniConv::get_string(itr->write()).c_str());
+                    /*
+                    UInt32 size = g_arrayIntfc->GetArraySize(arr);
+			        if (size != -1) {
+				        OBSEElement* elems = new OBSEElement[size];
+				        OBSEElement* keys = new OBSEElement[size];
+
+				        if (g_arrayIntfc->GetElements(arr, elems, keys)) {
+                            
+					        OBSEArray* newArr = g_arrayIntfc->CreateArray(NULL, 0, scriptObj);
+					        for (UInt32 i = 0; i < size; i++) {
+						        g_arrayIntfc->SetElement(newArr, i*2, elems[i]);
+						        g_arrayIntfc->SetElement(newArr, i*2+1, keys[i]);
+					        }
+
+					        // return the new array
+					        g_arrayIntfc->AssignCommandResult(newArr, result);
+                            
+                            for(UInt32 count=0; count<size; count++){
+
+                            }
+				        }
+
+				        delete[] elems;
+				        delete[] keys;
+                    }
+                    */
+			    }
+            }
+        
+
+            // assemble json data
+
+
+            //udp_output_queue.push();
+        }
+    }
+    
+    OBSEArray* arr = g_arrayIntfc->CreateStringMap(NULL, NULL, 0, scriptObj);
+    // return the empty array
+    g_arrayIntfc->AssignCommandResult(arr, result);
+
+    return true;
+}
+// get client list
+bool Cmd_NetworkPipe_GetClients_Execute(COMMAND_ARGS)
+{
+    return true;
+}
+// start external client
+bool Cmd_NetworkPipe_StartClient_Execute(COMMAND_ARGS)
+{
+    return true;
 }
 // returns status of the game being a new game
 // toggles off once checked
@@ -301,16 +389,21 @@ bool Cmd_NetworkPipe_IsNewGame_Execute(COMMAND_ARGS){
 
 #endif
 
+static ParamInfo kParams_NetworkPipe_Send[1] =
+{
+	{ "array var", kParamType_Integer, 0 },
+};
+
 /**************************
 * Command definitions
 **************************/
 
-DEFINE_COMMAND_PLUGIN(NetworkPipe_Receive, "runs poll on the udp io", 0, 0, NULL);
-//DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateService, "starts the active acceptance of messages in game", 0, 1, NULL);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_StartService, "starts the active acceptance of messages in game", 0, 0, NULL);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_StopService, "stops the active acceptance of messages in game", 0, 0, NULL);
-DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being started", 0, 0, NULL);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_Receive, "reads data from udp io", 0, 0, NULL);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_Send, "sends data to udp io", 0, 1, kParams_NetworkPipe_Send);
 
+DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being started", 0, 0, NULL);
 
 /*************************
 	Messaging API example
@@ -448,11 +541,12 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
     // command range 0x2790-0x279F assigned to NetworkPipe plugin
 	obse->SetOpcodeBase(0x2790);
 
-    // NetworkPipe Commands
-	obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_Receive,kRetnType_Array);
-    //obse->RegisterCommand(&kCommandInfo_NetworkPipe_CreateService);
+    // NetworkPipe Commands	    
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_StartService);
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_StopService);
+    obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_Receive,kRetnType_Array);
+    obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_Send,kRetnType_Array);
+
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_IsNewGame);
 
 	//obse->RegisterCommand(&kPluginTestCommand);

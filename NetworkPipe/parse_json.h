@@ -23,16 +23,13 @@ extern OBSEScriptInterface			* g_scriptIntfc;
 extern OBSESerializationInterface	* g_serialization;
 
 // the default is string if no tags are provided
-#define SIG_STRING_VAR "str:"
-#define SIG_NUMBER_VAR "int:"
 #define SIG_REFERENCE_VAR "ref:"
-#define SIG_FLOAT_VAR "flt:"
-#define SIG_TRUE_VAR "true"
-#define SIG_FALSE_VAR "false"
 
 typedef OBSEArrayVarInterface::Array	OBSEArray;
 typedef OBSEArrayVarInterface::Element	OBSEElement;
 
-void ParseJSON(const JSONNode & n, OBSEArray *jsonMap, bool isStringMap, Script *callingScript, bool CreateForms);
+void ParseJSON(const JSONNode & n, OBSEArray* jsonMap, bool isStringMap, Script *callingScript, bool CreateForms);
+
+void BuildJSON(JSONNode & n, OBSEArray* jsonMap, OBSEElement& root);
 
 #endif // _PARSE_JSON_H
