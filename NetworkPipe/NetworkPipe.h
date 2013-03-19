@@ -83,23 +83,35 @@ public:
 		: io_service_(io_service),
 		  socket_(io_service_, udp::endpoint(boost::asio::ip::address_v4::from_string(current_address), port))//, // udp::v4()  
 	{
+        // start udp receive
 		socket_.async_receive_from(
 			boost::asio::buffer(recv_buf), sender_endpoint_,
 			boost::bind(&udp_server::handle_receive_from, this,
 			  boost::asio::placeholders::error,
-			  boost::asio::placeholders::bytes_transferred));
+			  boost::asio::placeholders::bytes_transferred));  
+
+        send_timer_ = NULL;            
 	}
 
 	~udp_server(){
 		io_service_.stop();
+        if(send_timer_){
+            send_timer_->cancel();
+            delete send_timer_;
+        }
 	}
 
-	void start(){
+	void start(){        
 	}
+
+    void startSendTimer();
 
 	void handle_send_to(const boost::system::error_code& error, size_t bytes_recvd);
-
 	void handle_receive_from(const boost::system::error_code& error, size_t bytes_recvd);
+
+    //void handle_send_timer(const boost::system::error_code& error);
+    void handle_send_timer();
+    void send_timer_restart();
 
 	void stop()
 	{
@@ -110,8 +122,10 @@ public:
 		boost::asio::io_service& io_service_;
 		udp::socket socket_;
 		udp::endpoint sender_endpoint_;	
+        std::vector<udp::endpoint> clientList;
 		//std::auto_ptr<boost::asio::io_service::work> busy_work;
 		udp_buffer recv_buf;
+        boost::asio::deadline_timer* send_timer_;
 };
 
 

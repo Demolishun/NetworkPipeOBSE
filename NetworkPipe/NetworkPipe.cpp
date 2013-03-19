@@ -26,13 +26,17 @@ void udp_server::handle_send_to(const boost::system::error_code& error,
 
 void udp_server::handle_receive_from(const boost::system::error_code& error,
 	size_t bytes_recvd)
-{
-
+{    
 	if (!error && bytes_recvd > 0)
 	{
         recv_buf.c_array()[bytes_recvd] = '\0';
         if(NetworkPipeEnable){
             std::string clientdata = "";
+
+            // add client to list if new client
+            if(std::find(clientList.begin(), clientList.end(), sender_endpoint_) == clientList.end()){
+                clientList.push_back(sender_endpoint_);
+            }
 
             clientdata += sender_endpoint_.address().to_string().c_str();
             clientdata += ":";
@@ -46,17 +50,7 @@ void udp_server::handle_receive_from(const boost::system::error_code& error,
 
             // don't fill up the buffer if not receiving messages
 			udp_input_queue.push(ptmp);
-        }
-            
-        // temporary code to test packets
-        /*
-		socket_.async_send_to(
-			boost::asio::buffer(recv_buf.c_array(), bytes_recvd), sender_endpoint_,
-			//boost::asio::buffer(recv_buf), sender_endpoint_,
-			boost::bind(&udp_server::handle_send_to, this,
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred));        
-		*/
+        }                    
 	}
     // always reset receive trigger
     {		
@@ -67,4 +61,54 @@ void udp_server::handle_receive_from(const boost::system::error_code& error,
 			boost::asio::placeholders::error,
 			boost::asio::placeholders::bytes_transferred));		
 	}
+
+    {
+        // send test
+        /*
+        for(std::vector<udp::endpoint>::iterator itr = clientList.begin(); itr != clientList.end(); ++itr){
+            socket_.async_send_to(
+			    boost::asio::buffer("heart beat", strlen("heart beat")), *itr,			    
+			    boost::bind(&udp_server::handle_send_to, this,
+			    boost::asio::placeholders::error,
+			    boost::asio::placeholders::bytes_transferred));
+        }
+        */
+    }
+
+    // hack to get delayed timer working
+    if(!send_timer_){
+        startSendTimer();
+    }
+}
+
+void udp_server::send_timer_restart(){    
+    if(send_timer_){
+        // restart send timer
+        send_timer_->expires_from_now(boost::posix_time::milliseconds(500));
+        send_timer_->async_wait(boost::bind(&udp_server::handle_send_timer, this));
+    }
+}
+
+//void udp_server::handle_send_timer(const boost::system::error_code& error){
+void udp_server::handle_send_timer(){
+    //if (error != boost::asio::error::operation_aborted)
+    {        
+        // ignore restarts
+    }
+
+    for(std::vector<udp::endpoint>::iterator itr = clientList.begin(); itr != clientList.end(); ++itr){
+        socket_.async_send_to(
+			boost::asio::buffer("heart beat", strlen("heart beat")), *itr,			    
+			boost::bind(&udp_server::handle_send_to, this,
+			boost::asio::placeholders::error,
+			boost::asio::placeholders::bytes_transferred));
+    }
+
+    send_timer_restart(); 
+}
+
+void udp_server::startSendTimer(){
+    // start send timer                
+    send_timer_ = new boost::asio::deadline_timer(io_service_, boost::posix_time::milliseconds(500));
+    send_timer_restart();
 }
