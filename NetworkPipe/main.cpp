@@ -46,13 +46,14 @@ char * current_address = DEFAULT_UDP_ADDRESS;
 unsigned long current_port = DEFAULT_UDP_PORT;
 
 // udp buffer queues
-concurrent_queue<udp_packet> udp_input_queue; // input from external processes
-concurrent_queue<udp_packet> udp_output_queue; // output to external processes
+concurrent_queue<queue_data> udp_input_queue; // input from external processes
+concurrent_queue<queue_data> udp_output_queue; // output to external processes
 
 /*
 Init routine
 */
 udp_server *udp_server_ptr=NULL;
+//boost::asio::deadline_timer* dlineTimer=NULL;
 static void PluginInit_PostLoadCallback()
 {	
 	_MESSAGE("NetworkPipe: PluginInit_PostLoadCallback called");
@@ -61,8 +62,10 @@ static void PluginInit_PostLoadCallback()
 	{
 		_MESSAGE("NetworkPipe: Starting UDP");
 		udp_server_ptr = new udp_server(io_service, current_port);        
-		udp_thread = new boost::thread(boost::bind(&boost::asio::io_service::run, &io_service));         
-        //
+        //dlineTimer = new boost::asio::deadline_timer(io_service);
+		//udp_thread = new boost::thread(boost::bind(&boost::asio::io_service::run, &io_service)); 
+        udp_thread = new boost::thread(boost::bind(&udp_server::start, udp_server_ptr)); 
+        //udp_server_ptr->start();
 		_MESSAGE("NetworkPipe: UDP Started");
         NetworkPipeEnable = true;
 	}
@@ -223,27 +226,20 @@ bool Cmd_NetworkPipe_Receive_Execute(COMMAND_ARGS)
 {
 	if(!g_Interface->isEditor)
 	{
-        //if (ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList)){
-        //}
-
-		udp_packet temp_packet;
-		if(udp_input_queue.try_try_pop(temp_packet))
+        // grab data off the queue
+        queue_data ptmp;
+		if(udp_input_queue.try_try_pop(ptmp))
 		{
             // do not use data until we enable it
             if(NetworkPipeEnable)
             {
-                std::string temp_source = temp_packet.begin()->first;
-                udp_buffer temp_buffer = temp_packet.begin()->second;                 
+                std::string temp_data = ptmp["data"];
+                std::string temp_host = ptmp["host"]; 
+                std::string temp_port = ptmp["port"];                                               
 
-                // may need to setlocale
-                wchar_t *wbuf = new wchar_t[ temp_buffer.size() ];
-                size_t num_chars = mbstowcs( wbuf, temp_buffer.c_array(), temp_buffer.size() );
-                std::wstring ws( wbuf, num_chars );
-                delete wbuf;                                        
-
-                Console_Print(UniConv::get_string(ws).c_str());
-
-			    //Console_Print("NetworkPipe message: int: %d str: %s", strlen(temp_buffer.c_array()), temp_buffer.c_array());
+                // convert to unicode string
+                std::wstring ws = UniConv::get_wstring(temp_data);
+                
 			    // turn into JSON node
                 JSONNode n;
                 try{
@@ -278,7 +274,8 @@ bool Cmd_NetworkPipe_Receive_Execute(COMMAND_ARGS)
                     }
 
                     // add port and address data
-                    g_arrayIntfc->SetElement(arr,"address:port",temp_source.data());
+                    g_arrayIntfc->SetElement(arr,"host",temp_host.data());
+                    g_arrayIntfc->SetElement(arr,"port",temp_port.data());                    
 
                     // return the new array
 			        g_arrayIntfc->AssignCommandResult(arr, result);
@@ -315,74 +312,50 @@ bool Cmd_NetworkPipe_Send_Execute(COMMAND_ARGS){
                                         
                     BuildJSON(n, arr, root);
 
-                    JSONNode::iterator itr = n.find(UniConv::get_wstring("root"));
-                    JSONNode::iterator itr_add = n.end();
-                    if(itr != itr->end()){                                                
-                        itr_add = itr->find(UniConv::get_wstring(std::string("address:port")));
-                        if(itr_add != itr->end()){                          
-                            Console_Print("[%s],%s",UniConv::get_string(itr_add->name()).c_str(),UniConv::get_string(itr_add->as_string()).c_str());                        
+                    JSONNode::iterator itr = n.find(UniConv::get_wstring("root"));                    
+                    JSONNode::iterator itr_data = n.end();
+                    JSONNode::iterator itr_host = n.end();
+                    JSONNode::iterator itr_port = n.end();
+                    if(itr != itr->end()){ 
+                        itr_data = itr->find(UniConv::get_wstring(std::string("data")));
+                        if(itr_data != itr->end()){                          
+                            //Console_Print("[%s],%s",UniConv::get_string(itr_data->name()).c_str(),UniConv::get_string(itr_data->as_string()).c_str());                        
+                        }
+                        itr_host = itr->find(UniConv::get_wstring(std::string("host")));
+                        if(itr_host != itr->end()){                          
+                            //Console_Print("[%s],%s",UniConv::get_string(itr_host->name()).c_str(),UniConv::get_string(itr_host->as_string()).c_str());                        
+                        }
+                        itr_port = itr->find(UniConv::get_wstring(std::string("port")));
+                        if(itr_port != itr->end()){                          
+                            //Console_Print("[%s],%s",UniConv::get_string(itr_port->name()).c_str(),UniConv::get_string(itr_port->as_string()).c_str());                        
                         }
                     }
 
-                    // remove network:port key
-                    
-                    
-                    udp_packet temp_packet;
-                    udp_buffer temp_buffer;
-                    //std::string tmpStr;
-                    //std::stringstream tmpStream;
-                    //tmpStream << UniConv::get_string(itr->write());
-                    //tmpStream >> temp_buffer.c_array();
-                    if(itr_add != itr->end()){
-                        JSONNode tNode = itr_add->duplicate();
-                        itr->erase(itr_add);
-
-                        // 
-                        std::string tmpStr;
-                        std::stringstream tmpStream;
-                        tmpStream << UniConv::get_string(itr->write());
-                        tmpStream >> temp_buffer.c_array();
-
-                        temp_packet[UniConv::get_string(tNode.as_string())] = temp_buffer;
-		                udp_output_queue.push(temp_packet);                    
-                    }
-                    
-                                        
-                    Console_Print(UniConv::get_string(itr->write()).c_str());
                     /*
-                    UInt32 size = g_arrayIntfc->GetArraySize(arr);
-			        if (size != -1) {
-				        OBSEElement* elems = new OBSEElement[size];
-				        OBSEElement* keys = new OBSEElement[size];
-
-				        if (g_arrayIntfc->GetElements(arr, elems, keys)) {
-                            
-					        OBSEArray* newArr = g_arrayIntfc->CreateArray(NULL, 0, scriptObj);
-					        for (UInt32 i = 0; i < size; i++) {
-						        g_arrayIntfc->SetElement(newArr, i*2, elems[i]);
-						        g_arrayIntfc->SetElement(newArr, i*2+1, keys[i]);
-					        }
-
-					        // return the new array
-					        g_arrayIntfc->AssignCommandResult(newArr, result);
-                            
-                            for(UInt32 count=0; count<size; count++){
-
-                            }
-				        }
-
-				        delete[] elems;
-				        delete[] keys;
+                    if(itr_host != itr->end() && itr_port != itr->end()){
+                        Console_Print("host=%s, port=%s, data=%s",
+                            UniConv::get_string(itr_host->as_string()).c_str(),
+                            UniConv::get_string(itr_port->as_string()).c_str(),
+                            UniConv::get_string(itr->write()).c_str());
                     }
                     */
+                    
+                    queue_data ptmp;                    
+                    if(itr_host != itr->end() && itr_port != itr->end()){
+                        // copy and remove host and port data
+                        JSONNode tHost = itr_host->duplicate();
+                        JSONNode tPort = itr_port->duplicate();
+                        itr->erase(itr_host);
+                        itr->erase(itr_port);                        
+
+                        ptmp["host"] = UniConv::get_string(tHost.as_string());
+                        ptmp["port"] = UniConv::get_string(tPort.as_string());
+                        ptmp["data"] = UniConv::get_string(itr->write()); 
+
+                        udp_output_queue.push(ptmp);
+                    }                                                                                                    
 			    }
-            }
-        
-
-            // assemble json data
-
-
-            //udp_output_queue.push();
+            }        
         }
     }
     

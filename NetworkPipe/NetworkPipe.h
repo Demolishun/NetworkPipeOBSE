@@ -21,6 +21,7 @@ typedef OBSEArrayVarInterface::Element	OBSEElement;
 #include <boost/thread.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/signal.hpp>
 #include <vector>
 
 #include <string>
@@ -43,6 +44,8 @@ typedef OBSEArrayVarInterface::Element	OBSEElement;
 // udp buffer type
 typedef boost::array<char, MAX_UDP_PACKET_SIZE> udp_buffer;
 typedef std::map<std::string,udp_buffer> udp_packet;
+// queue data
+typedef std::map<std::string,std::string> queue_data;
 
 #if ENABLE_EXTRACT_ARGS_MACROS
 
@@ -72,8 +75,8 @@ extern char * current_address;
 extern unsigned long current_port;
 
 // udp buffer queues
-extern concurrent_queue<udp_packet> udp_input_queue; // input from external processes
-extern concurrent_queue<udp_packet> udp_output_queue; // output to external processes
+extern concurrent_queue<queue_data> udp_input_queue; // input from external processes
+extern concurrent_queue<queue_data> udp_output_queue; // output to external processes
 
 using boost::asio::ip::udp;
 class udp_server
@@ -101,9 +104,8 @@ public:
         }
 	}
 
-	void start(){        
-	}
-
+	void start();
+    
     void startSendTimer();
 
 	void handle_send_to(const boost::system::error_code& error, size_t bytes_recvd);
@@ -126,6 +128,7 @@ public:
 		//std::auto_ptr<boost::asio::io_service::work> busy_work;
 		udp_buffer recv_buf;
         boost::asio::deadline_timer* send_timer_;
+        
 };
 
 
