@@ -2,23 +2,25 @@
 Todo:
 1. Function to launch external app for connecting to the engine.  
    Will use a Python app with examples. Instructions for wrapping with Py2exe for easy packaging.
-2. Function to monitor external app to determine the health of the app/apps.
-3. Come up with a messaging scheme as an example of how to use the plugin.
+2. Function to monitor external app to determine the health of the app/apps.  
+3. Come up with a messaging scheme as an example of how to use the plugin. 
    Basic functions in script will be created for simple operations such as storing and retrieving of data.
    Can be used as a base for other mods, or the user can redefine how the messaging
    is done to suit thier needs.
-4. Function to change the port.  
+4. Function to change the port.  Done!
 5. Error return messages and acks for bad/good data.  Most likely in examples of how to use
    as there is really nothing hard coding this right now.
 6. Function to send data to a client or clients.  This will need a list of active clients that
    gets updated by the UDP thread.  Each message should have a tag showing the client which 
    produced the message.  This will allow the script code to create responses for individual
-   clients as it parses the message list.
+   clients as it parses the message list.  Done!
 */
 
 #include "NetworkPipe.h"
 #include "static_callbacks.h"
 #include "obse/PluginAPI.h"
+
+#define SAFE_DELETE(ptr) delete ptr; ptr = NULL;
 
 /*
 Control plugin.  Controls conversion of data received.
@@ -39,8 +41,8 @@ boost::asio::io_service io_service;
 boost::system::error_code ec;
 // thread pointer
 boost::thread* udp_thread=NULL;
-// timer
-//boost::asio::deadline_timer send_timer(io_service);
+// server pointer
+udp_server *udp_server_ptr=NULL;
 // port settings
 char * current_address = DEFAULT_UDP_ADDRESS;
 unsigned long current_port = DEFAULT_UDP_PORT;
@@ -52,10 +54,21 @@ concurrent_queue<queue_data> udp_output_queue; // output to external processes
 // process handles
 std::vector<LPPROCESS_INFORMATION> processHandles;
 
+// standard stop service call
+void stopService()
+{     
+    // stop server and thread
+    if(udp_server_ptr){
+        udp_server_ptr->stop();
+        SAFE_DELETE(udp_server_ptr);        
+    }
+    if(udp_thread)
+        SAFE_DELETE(udp_thread);
+}
+
 /*
 Init routine
 */
-udp_server *udp_server_ptr=NULL;
 static void PluginInit_PostLoadCallback()
 {	
 	_MESSAGE("NetworkPipe: PluginInit_PostLoadCallback called");
@@ -82,12 +95,15 @@ static void NetworkPipe_Exit()
 	NetworkPipeEnable = false;
     IsGameLoaded = false;
 
-    if(udp_server_ptr){
-        udp_server_ptr->stop();
-        delete udp_server_ptr;
-    }
-    if(udp_thread)
-        delete udp_thread;                
+    // stop external processes        
+    for(std::vector<LPPROCESS_INFORMATION>::iterator itr=processHandles.begin(); itr!=processHandles.end(); ++itr){
+        TerminateProcess((*itr)->hProcess, 0);
+        CloseHandle(*itr);
+        delete (*itr);
+    }    
+
+    // stop server and thread
+    stopService();            
 }
 
 static void NetworkPipe_LoadGameCallback(void * reserved)
@@ -207,12 +223,15 @@ bool Cmd_NetworkPipe_StopService_Execute(COMMAND_ARGS)
 {
     // disable service
     NetworkPipeEnable = false;
+   
+    // stop server and thread
+    stopService();           
 
     // controlled by events
     //IsGameLoaded = false;
 
-    // return IsGameLoaded state
-    *result = IsGameLoaded;
+    // bogus return
+    *result = 0;
 
     return true;
 }
@@ -406,6 +425,7 @@ bool Cmd_NetworkPipe_IsNewGame_Execute(COMMAND_ARGS){
 }
 
 // max 0x200 (512) characters
+// returns index of client or -1 to indicate client failed to start
 bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
     STARTUPINFO startupInfo;
     LPPROCESS_INFORMATION processInfo = new PROCESS_INFORMATION;
@@ -417,30 +437,46 @@ bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
     startupInfo.cb = sizeof(STARTUPINFO);
     // tell the application that we are setting the window display 
     // information within this structure
-    startupInfo.dwFlags = STARTF_USESHOWWINDOW;
-    // set the window display to HIDE
-    //startupInfo.wShowWindow = SW_HIDE;
-    startupInfo.wShowWindow = SW_SHOWNORMAL; //debug
+    startupInfo.dwFlags = STARTF_USESHOWWINDOW;    
 
     long retVal = -1;    
 
     char execStr[0x200] = { 0 };
-    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, execStr)){
+    int showFlag = -1;
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, execStr, &showFlag)){
         // check string not NULL and string length
         if(execStr && strlen(execStr) < 0x200){
-            long tmpRet = processHandles.size();
-            
-            if(!CreateProcess(NULL,"python.exe",NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
-                _MESSAGE("Could not launch python.exe");
+            long tmpRet = processHandles.size();             
+
+            // set the window display mode of external app
+            switch(showFlag){
+            case 0:
+                startupInfo.wShowWindow = SW_HIDE;
+                break;
+            case 1:
+                startupInfo.wShowWindow = SW_SHOWNORMAL;
+                break;
+            case 2:
+                startupInfo.wShowWindow = SW_SHOWMINIMIZED;
+                break;
+            default:
+                startupInfo.wShowWindow = SW_HIDE;
+            }            
+
+            if(!CreateProcess(NULL,execStr,NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
+                _MESSAGE("Could not launch '%s'",execStr);
+                SAFE_DELETE(processInfo);
             }else{
-                _MESSAGE("python.exe was launched");
-                //TerminateProcess(processInfo->hProcess, 0);
-                CloseHandle(processInfo);
-                delete processInfo;
+                _MESSAGE("'%s' was launched with show mode: %d",execStr,startupInfo.wShowWindow);
+                // store process handle
+                processHandles.push_back(processInfo);
+                // return process index
+                retVal = tmpRet;                           
             }
         }
-    }
+    }    
 
+    // returns the process index in the processHandles structure
     *result = retVal;
 
     return true;
@@ -458,9 +494,10 @@ static ParamInfo kParams_NetworkPipe_Send[1] =
 	{ "array var", kParamType_Integer, 0 },
 };
 
-static ParamInfo kParams_NetworkPipe_CreateClient[1] =
+static ParamInfo kParams_NetworkPipe_CreateClient[2] =
 {
 	{ "exec path", kParamType_String, 0 },
+    { "show flag", kParamType_Integer, 1 }, // is optional so set last value to 1
 };
 
 /**************************
@@ -473,7 +510,7 @@ DEFINE_COMMAND_PLUGIN(NetworkPipe_Receive, "reads data from udp io", 0, 0, NULL)
 DEFINE_COMMAND_PLUGIN(NetworkPipe_Send, "sends data to udp io", 0, 1, kParams_NetworkPipe_Send);
 
 DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being started", 0, 0, NULL);
-DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "checks status of a new game being started", 0, 1, kParams_NetworkPipe_CreateClient);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "creates client program to be used to interact with UDP server", 0, 2, kParams_NetworkPipe_CreateClient);
 
 /*************************
 	Messaging API example
