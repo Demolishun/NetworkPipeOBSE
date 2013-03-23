@@ -10,7 +10,7 @@ import sys, time
 
 UDP_IP="127.0.0.1"
 #UDP_IP="0.0.0.0"
-UDP_PORT=12345
+UDP_PORT=54321
 
 msg_object = {}
 msg_object["one"] = 12

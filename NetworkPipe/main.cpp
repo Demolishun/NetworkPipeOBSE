@@ -38,7 +38,7 @@ Networking
 boost::asio::io_service io_service;
 boost::system::error_code ec;
 // thread pointer
-boost::thread* udp_thread;
+boost::thread* udp_thread=NULL;
 // timer
 //boost::asio::deadline_timer send_timer(io_service);
 // port settings
@@ -49,25 +49,24 @@ unsigned long current_port = DEFAULT_UDP_PORT;
 concurrent_queue<queue_data> udp_input_queue; // input from external processes
 concurrent_queue<queue_data> udp_output_queue; // output to external processes
 
+// process handles
+std::vector<LPPROCESS_INFORMATION> processHandles;
+
 /*
 Init routine
 */
 udp_server *udp_server_ptr=NULL;
-//boost::asio::deadline_timer* dlineTimer=NULL;
 static void PluginInit_PostLoadCallback()
 {	
 	_MESSAGE("NetworkPipe: PluginInit_PostLoadCallback called");
     
 	if(!g_Interface->isEditor)
 	{
-		_MESSAGE("NetworkPipe: Starting UDP");
-		udp_server_ptr = new udp_server(io_service, current_port);        
-        //dlineTimer = new boost::asio::deadline_timer(io_service);
-		//udp_thread = new boost::thread(boost::bind(&boost::asio::io_service::run, &io_service)); 
-        udp_thread = new boost::thread(boost::bind(&udp_server::start, udp_server_ptr)); 
-        //udp_server_ptr->start();
-		_MESSAGE("NetworkPipe: UDP Started");
-        NetworkPipeEnable = true;
+		//_MESSAGE("NetworkPipe: Starting UDP");
+		//udp_server_ptr = new udp_server(io_service, current_port);                 
+        //udp_thread = new boost::thread(boost::bind(&udp_server::start, udp_server_ptr));         
+		//_MESSAGE("NetworkPipe: UDP Started");
+        //NetworkPipeEnable = true;
 	}
     else
 	{
@@ -83,9 +82,12 @@ static void NetworkPipe_Exit()
 	NetworkPipeEnable = false;
     IsGameLoaded = false;
 
-    udp_server_ptr->stop();
-    delete udp_thread;
-    delete udp_server_ptr;    
+    if(udp_server_ptr){
+        udp_server_ptr->stop();
+        delete udp_server_ptr;
+    }
+    if(udp_thread)
+        delete udp_thread;                
 }
 
 static void NetworkPipe_LoadGameCallback(void * reserved)
@@ -169,15 +171,33 @@ bool Cmd_NetworkPipe_CreateService_Execute(COMMAND_ARGS)
 
 // start the service
 bool Cmd_NetworkPipe_StartService_Execute(COMMAND_ARGS)
-{    
-    // now enable as a script has started the service
-    NetworkPipeEnable = true;
-    // let the PostLoadGame event handle this
-    //if(!NewGameLoaded)
-    //    IsGameLoaded = true;
+{   
+    // Was this loaded already?
+    bool wasStarted = NetworkPipeEnable;
 
-    // return IsGameLoaded state
-    *result = IsGameLoaded;
+    // add command line args to choose port
+    UInt32 tmpport = 0;
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, &tmpport)){
+        current_port = tmpport;
+        //Console_Print("Port: %d", tmpport);
+    }
+
+    // startup server
+    if(!NetworkPipeEnable){
+        _MESSAGE("NetworkPipe: Starting UDP");    
+	    udp_server_ptr = new udp_server(io_service, current_port);                   
+        udp_thread = new boost::thread(boost::bind(&udp_server::start, udp_server_ptr));         
+        _MESSAGE("NetworkPipe: UDP Started");
+    }    	    
+    
+    if(udp_server_ptr && udp_thread){
+        NetworkPipeEnable = true;   
+    }else{
+        _MESSAGE("NetworkPipe: Could not allocate memory for UDP objects.");
+    }
+
+    // return if the service was started previously
+    *result = wasStarted;
 
     return true;
 }
@@ -385,24 +405,75 @@ bool Cmd_NetworkPipe_IsNewGame_Execute(COMMAND_ARGS){
     return true;
 }
 
+// max 0x200 (512) characters
+bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
+    STARTUPINFO startupInfo;
+    LPPROCESS_INFORMATION processInfo = new PROCESS_INFORMATION;
+
+    // clear the memory to prevent garbage
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+
+    // set size of structure (not using Ex version)
+    startupInfo.cb = sizeof(STARTUPINFO);
+    // tell the application that we are setting the window display 
+    // information within this structure
+    startupInfo.dwFlags = STARTF_USESHOWWINDOW;
+    // set the window display to HIDE
+    //startupInfo.wShowWindow = SW_HIDE;
+    startupInfo.wShowWindow = SW_SHOWNORMAL; //debug
+
+    long retVal = -1;    
+
+    char execStr[0x200] = { 0 };
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, execStr)){
+        // check string not NULL and string length
+        if(execStr && strlen(execStr) < 0x200){
+            long tmpRet = processHandles.size();
+            
+            if(!CreateProcess(NULL,"python.exe",NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
+                _MESSAGE("Could not launch python.exe");
+            }else{
+                _MESSAGE("python.exe was launched");
+                //TerminateProcess(processInfo->hProcess, 0);
+                CloseHandle(processInfo);
+                delete processInfo;
+            }
+        }
+    }
+
+    *result = retVal;
+
+    return true;
+}
+
 
 #endif
+static ParamInfo kParams_NetworkPipe_Start[2] =
+{
+	{ "network port", kParamType_Integer, 0 },
+};
 
 static ParamInfo kParams_NetworkPipe_Send[1] =
 {
 	{ "array var", kParamType_Integer, 0 },
 };
 
+static ParamInfo kParams_NetworkPipe_CreateClient[1] =
+{
+	{ "exec path", kParamType_String, 0 },
+};
+
 /**************************
 * Command definitions
 **************************/
 
-DEFINE_COMMAND_PLUGIN(NetworkPipe_StartService, "starts the active acceptance of messages in game", 0, 0, NULL);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_StartService, "starts the active acceptance of messages in game", 0, 1, kParams_NetworkPipe_Start);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_StopService, "stops the active acceptance of messages in game", 0, 0, NULL);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_Receive, "reads data from udp io", 0, 0, NULL);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_Send, "sends data to udp io", 0, 1, kParams_NetworkPipe_Send);
 
 DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being started", 0, 0, NULL);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "checks status of a new game being started", 0, 1, kParams_NetworkPipe_CreateClient);
 
 /*************************
 	Messaging API example
@@ -547,6 +618,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
     obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_Send,kRetnType_Array);
 
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_IsNewGame);
+    obse->RegisterCommand(&kCommandInfo_NetworkPipe_CreateClient);
 
 	//obse->RegisterCommand(&kPluginTestCommand);
 
