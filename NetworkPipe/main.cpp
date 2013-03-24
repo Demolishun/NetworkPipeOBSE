@@ -1,7 +1,7 @@
 /*
 Todo:
 1. Function to launch external app for connecting to the engine.  
-   Will use a Python app with examples. Instructions for wrapping with Py2exe for easy packaging.
+   Will use a Python app with examples. Instructions for wrapping with Py2exe for easy packaging.  Done!
 2. Function to monitor external app to determine the health of the app/apps.  
 3. Come up with a messaging scheme as an example of how to use the plugin. 
    Basic functions in script will be created for simple operations such as storing and retrieving of data.
@@ -19,6 +19,9 @@ Todo:
 #include "NetworkPipe.h"
 #include "static_callbacks.h"
 #include "obse/PluginAPI.h"
+
+// command range 0x2790-0x279F assigned to NetworkPipe plugin
+#define NP_OPCODEBASE 0x2790
 
 #define SAFE_DELETE(ptr) delete ptr; ptr = NULL;
 
@@ -52,7 +55,8 @@ concurrent_queue<queue_data> udp_input_queue; // input from external processes
 concurrent_queue<queue_data> udp_output_queue; // output to external processes
 
 // process handles
-std::vector<LPPROCESS_INFORMATION> processHandles;
+//std::vector<LPPROCESS_INFORMATION> processHandles;
+std::map<DWORD,LPPROCESS_INFORMATION> processHandles;
 
 // standard stop service call
 void stopService()
@@ -96,10 +100,10 @@ static void NetworkPipe_Exit()
     IsGameLoaded = false;
 
     // stop external processes        
-    for(std::vector<LPPROCESS_INFORMATION>::iterator itr=processHandles.begin(); itr!=processHandles.end(); ++itr){
-        TerminateProcess((*itr)->hProcess, 0);
-        CloseHandle(*itr);
-        delete (*itr);
+    for(std::map<DWORD,LPPROCESS_INFORMATION>::iterator itr=processHandles.begin(); itr!=processHandles.end(); ++itr){                
+        TerminateProcess(itr->second->hProcess, 0);
+        CloseHandle(itr->second);
+        delete (itr->second);
     }    
 
     // stop server and thread
@@ -404,16 +408,7 @@ bool Cmd_NetworkPipe_Send_Execute(COMMAND_ARGS){
 
     return true;
 }
-// get client list
-bool Cmd_NetworkPipe_GetClients_Execute(COMMAND_ARGS)
-{
-    return true;
-}
-// start external client
-bool Cmd_NetworkPipe_StartClient_Execute(COMMAND_ARGS)
-{
-    return true;
-}
+
 // returns status of the game being a new game
 // toggles off once checked
 bool Cmd_NetworkPipe_IsNewGame_Execute(COMMAND_ARGS){
@@ -424,8 +419,10 @@ bool Cmd_NetworkPipe_IsNewGame_Execute(COMMAND_ARGS){
     return true;
 }
 
-// max 0x200 (512) characters
-// returns index of client or -1 to indicate client failed to start
+// creates a client
+// max 0x200 (512) characters for command path including the parameters
+// returns index of client or 0 to indicate client failed to start
+#define NP_MAX_COMMAND_SIZE 0x200
 bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
     STARTUPINFO startupInfo;
     LPPROCESS_INFORMATION processInfo = new PROCESS_INFORMATION;
@@ -439,15 +436,13 @@ bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
     // information within this structure
     startupInfo.dwFlags = STARTF_USESHOWWINDOW;    
 
-    long retVal = -1;    
+    unsigned long retVal = 0;    
 
-    char execStr[0x200] = { 0 };
+    char execStr[NP_MAX_COMMAND_SIZE] = { 0 };
     int showFlag = -1;
     if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, execStr, &showFlag)){
         // check string not NULL and string length
-        if(execStr && strlen(execStr) < 0x200){
-            long tmpRet = processHandles.size();             
-
+        if(execStr && strlen(execStr) < NP_MAX_COMMAND_SIZE){                       
             // set the window display mode of external app
             switch(showFlag){
             case 0:
@@ -468,10 +463,15 @@ bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
                 SAFE_DELETE(processInfo);
             }else{
                 _MESSAGE("'%s' was launched with show mode: %d",execStr,startupInfo.wShowWindow);
+                // store process handle location for new process
+                long tmpRet = processHandles.size();  
                 // store process handle
-                processHandles.push_back(processInfo);
+                processHandles[processInfo->dwProcessId] = processInfo;
+
+                _MESSAGE("Process: '%s', PID: %d",execStr, processInfo->dwProcessId);
+
                 // return process index
-                retVal = tmpRet;                           
+                retVal = processInfo->dwProcessId;                           
             }
         }
     }    
@@ -481,10 +481,123 @@ bool Cmd_NetworkPipe_CreateClient_Execute(COMMAND_ARGS){
 
     return true;
 }
+// kills a client started by CreateClient
+// parameter is the index into the process list
+bool Cmd_NetworkPipe_KillClient_Execute(COMMAND_ARGS){
+    unsigned long pid = 0;
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, &pid)){
+        _MESSAGE("delete PID: %d", pid);
 
+        // make sure the pid is in the list
+        if(processHandles.count(pid)){
+            _MESSAGE("Found PID", pid);
 
-#endif
-static ParamInfo kParams_NetworkPipe_Start[2] =
+            // grab pointer to process info
+            LPPROCESS_INFORMATION processInfo = processHandles[pid];
+            processHandles.erase(pid);                
+
+            // kill the process, close the handle, and delete the memory holding the process info
+            TerminateProcess(processInfo->hProcess, 0);
+            CloseHandle(processInfo);
+            SAFE_DELETE(processInfo);
+        }
+    }   
+
+    return true;
+}
+
+// get client list
+bool Cmd_NetworkPipe_GetClients_Execute(COMMAND_ARGS)
+{
+    
+    return true;
+}
+
+// data for get/set data
+std::map<std::string, OBSEElement> persistentData;
+
+// get and set persistent data
+// overcomes limitations of storing data is quest variables
+// designed to store data that will survive game loads
+// takes a map of data 
+bool Cmd_NetworkPipe_SetData_Execute(COMMAND_ARGS)
+{
+    *result = 0;
+
+    UInt32 arrID = 0;
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, &arrID)){
+        OBSEArray* arr = g_arrayIntfc->LookupArrayByID(arrID);
+	    if (arr) {
+            // get contents of array
+			UInt32 size = g_arrayIntfc->GetArraySize(arr);
+			if (size != -1) {
+                // get the elems and keys
+			    OBSEElement* elems = new OBSEElement[size];
+			    OBSEElement* keys = new OBSEElement[size];
+
+                // cycle through and assign data to map
+                if (g_arrayIntfc->GetElements(arr, elems, keys)) {
+                    for (UInt32 i = 0; i < size; i++) {
+                        if(keys[i].String() != NULL)
+                            persistentData[keys[i].String()] = elems[i];					   
+				    }
+
+                    *result = 1;  // result success
+                }                
+
+                // delete data when done
+                delete[] elems;
+			    delete[] keys;
+            }
+        }
+    }
+
+    return true;
+}
+// takes an array of strings
+// returns a map of data
+bool Cmd_NetworkPipe_GetData_Execute(COMMAND_ARGS)
+{
+    // create output array
+    OBSEArray* newArr = g_arrayIntfc->CreateStringMap(NULL, NULL, 0, scriptObj);
+    // set empty array as output, empty if failed to lookup any values
+    g_arrayIntfc->AssignCommandResult(newArr, result);    
+
+    UInt32 arrID = 0;
+    if(ExtractArgsEx(paramInfo, arg1, opcodeOffsetPtr, scriptObj, eventList, &arrID)){
+        OBSEArray* arr = g_arrayIntfc->LookupArrayByID(arrID);
+        if (arr) {
+            // get contents of array
+			UInt32 size = g_arrayIntfc->GetArraySize(arr);
+			if (size != -1) {
+                // get the elems and keys
+			    OBSEElement* elems = new OBSEElement[size];
+			    OBSEElement* keys = new OBSEElement[size];                
+
+                // cycle through and assign data to map
+                if (g_arrayIntfc->GetElements(arr, elems, keys)) {
+                    for (UInt32 i = 0; i < size; i++){
+                        if(elems[i].String() != NULL){
+                            if(persistentData.count(elems[i].String())){                                
+                                g_arrayIntfc->SetElement(newArr, elems[i].String(), persistentData[elems[i].String()]);
+                            }                            
+                        }
+				    }                    
+                }  
+
+                // delete data when done
+                delete[] elems;
+			    delete[] keys;
+            }
+        }
+    }
+
+    return true;
+}
+
+#endif // Oblivion
+
+static ParamInfo kParams_NetworkPipe_Start[1] =
 {
 	{ "network port", kParamType_Integer, 0 },
 };
@@ -500,6 +613,21 @@ static ParamInfo kParams_NetworkPipe_CreateClient[2] =
     { "show flag", kParamType_Integer, 1 }, // is optional so set last value to 1
 };
 
+static ParamInfo kParams_NetworkPipe_KillClient[1] =
+{
+	{ "client pid", kParamType_Integer, 0 },
+};
+
+static ParamInfo kParams_NetworkPipe_SetData[1] =
+{
+	{ "array var", kParamType_Integer, 0 },
+};
+
+static ParamInfo kParams_NetworkPipe_GetData[1] =
+{
+	{ "array var", kParamType_Integer, 0 },
+};
+
 /**************************
 * Command definitions
 **************************/
@@ -510,7 +638,13 @@ DEFINE_COMMAND_PLUGIN(NetworkPipe_Receive, "reads data from udp io", 0, 0, NULL)
 DEFINE_COMMAND_PLUGIN(NetworkPipe_Send, "sends data to udp io", 0, 1, kParams_NetworkPipe_Send);
 
 DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being started", 0, 0, NULL);
-DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "creates client program to be used to interact with UDP server", 0, 2, kParams_NetworkPipe_CreateClient);
+
+DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "creates client program", 0, 2, kParams_NetworkPipe_CreateClient);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_KillClient, "kills client program", 0, 1, kParams_NetworkPipe_KillClient);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_GetClients, "returns client program list", 0, 0, NULL);
+
+DEFINE_COMMAND_PLUGIN(NetworkPipe_SetData, "stores data", 0, 1, kParams_NetworkPipe_SetData);
+DEFINE_COMMAND_PLUGIN(NetworkPipe_GetData, "retrieves data", 0, 1, kParams_NetworkPipe_GetData);
 
 /*************************
 	Messaging API example
@@ -646,7 +780,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	// register commands
     // 0x2000 is for testing only
     // command range 0x2790-0x279F assigned to NetworkPipe plugin
-	obse->SetOpcodeBase(0x2790);
+	obse->SetOpcodeBase(NP_OPCODEBASE);
 
     // NetworkPipe Commands	    
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_StartService);
@@ -656,6 +790,10 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_IsNewGame);
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_CreateClient);
+    obse->RegisterCommand(&kCommandInfo_NetworkPipe_KillClient);
+    obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_GetClients,kRetnType_Array);
+    obse->RegisterCommand(&kCommandInfo_NetworkPipe_SetData);
+    obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_GetData,kRetnType_Array);
 
 	//obse->RegisterCommand(&kPluginTestCommand);
 
