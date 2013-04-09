@@ -100,7 +100,7 @@ void ParseJSON(const JSONNode & n, OBSEArray *jsonMap, bool isStringMap, Script 
                 {
                     OBSEArray *subMap = g_arrayIntfc->CreateArray(NULL, 0, callingScript);
                     if(isStringMap){
-                        g_arrayIntfc->SetElement(jsonMap,"array",subMap);
+                        g_arrayIntfc->SetElement(jsonMap,node_name.c_str(),subMap);
                     }else{
                         g_arrayIntfc->AppendElement(jsonMap,subMap);
                     }
@@ -114,7 +114,7 @@ void ParseJSON(const JSONNode & n, OBSEArray *jsonMap, bool isStringMap, Script 
                 {
 			        OBSEArray *subMap = g_arrayIntfc->CreateStringMap(NULL, NULL, 0, callingScript);
                     if(isStringMap){
-                        g_arrayIntfc->SetElement(jsonMap,"object",subMap);
+                        g_arrayIntfc->SetElement(jsonMap,node_name.c_str(),subMap);
                     }else{
                         g_arrayIntfc->AppendElement(jsonMap,subMap);
                     }

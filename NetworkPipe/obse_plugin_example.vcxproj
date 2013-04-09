@@ -158,7 +158,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="NetworkPipe.cpp" />
-    <ClCompile Include="obse_helper.cpp" />
+    <ClCompile Include="obse_helper.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="parse_json.cpp" />
     <ClCompile Include="unicode_conv.cpp" />
   </ItemGroup>

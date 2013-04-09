@@ -1,15 +1,14 @@
 /*
 Todo:
-1. Function to launch external app for connecting to the engine.  
-   Will use a Python app with examples. Instructions for wrapping with Py2exe for easy packaging.  Done!
-2. Function to monitor external app to determine the health of the app/apps.  
+1. Function to launch external app for connecting to the engine.  Done!
+2. Will use a Python app with examples. Instructions for wrapping with Py2exe for easy packaging.  
 3. Come up with a messaging scheme as an example of how to use the plugin. 
    Basic functions in script will be created for simple operations such as storing and retrieving of data.
    Can be used as a base for other mods, or the user can redefine how the messaging
-   is done to suit thier needs.
+   is done to suit thier needs.  Do through example mods.
 4. Function to change the port.  Done!
 5. Error return messages and acks for bad/good data.  Most likely in examples of how to use
-   as there is really nothing hard coding this right now.
+   as there is really nothing hard coding this right now.  Do through example mods.
 6. Function to send data to a client or clients.  This will need a list of active clients that
    gets updated by the UDP thread.  Each message should have a tag showing the client which 
    produced the message.  This will allow the script code to create responses for individual
@@ -17,8 +16,10 @@ Todo:
 */
 
 #include "NetworkPipe.h"
-#include "static_callbacks.h"
+//#include "static_callbacks.h"
 #include "obse/PluginAPI.h"
+//#include "obse/ScriptUtils.h"  // errors when included
+//ExpressionEvaluator eval(PASS_COMMAND_ARGS);
 
 // command range 0x2790-0x279F assigned to NetworkPipe plugin
 #define NP_OPCODEBASE 0x2790
@@ -69,6 +70,44 @@ void stopService()
     if(udp_thread)
         SAFE_DELETE(udp_thread);
 }
+// standard kill process call
+void stopProcess(DWORD pid)
+{
+    STARTUPINFO startupInfo;
+    LPPROCESS_INFORMATION processInfo = new PROCESS_INFORMATION;
+
+    // clear the memory to prevent garbage
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+
+    // set size of structure (not using Ex version)
+    startupInfo.cb = sizeof(STARTUPINFO);
+    // tell the application that we are setting the window display 
+    // information within this structure
+    startupInfo.dwFlags = STARTF_USESHOWWINDOW;    
+    // hide process
+    startupInfo.wShowWindow = SW_HIDE;
+
+    //TerminateProcess(itr->second->hProcess, 0);  // not friendly to process, and does not kill child processes
+    std::stringstream comStream;       
+    comStream << "taskkill /pid ";
+    comStream << pid;
+    //comStream << " /t /f";  // to be more like TerminateProcess
+    _MESSAGE("%s", comStream.str().c_str());             
+    //system(comStream.str().c_str()); // works, but pops up a window momentarilly when called        
+    
+    //LPSTR s = const_cast<char *>(comStream.str().c_str());  
+    LPSTR cString = strdup( comStream.str().c_str() );
+    if(!CreateProcess(NULL,cString,NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
+        _MESSAGE("Could not launch '%s'",cString);
+        SAFE_DELETE(processInfo);
+    }else{
+        // clean up
+        CloseHandle(processInfo);
+        SAFE_DELETE(processInfo);
+    }
+    // clean up 
+    free(cString);
+}
 
 /*
 Init routine
@@ -100,8 +139,16 @@ static void NetworkPipe_Exit()
     IsGameLoaded = false;
 
     // stop external processes        
-    for(std::map<DWORD,LPPROCESS_INFORMATION>::iterator itr=processHandles.begin(); itr!=processHandles.end(); ++itr){                
-        TerminateProcess(itr->second->hProcess, 0);
+    for(std::map<DWORD,LPPROCESS_INFORMATION>::iterator itr=processHandles.begin(); itr!=processHandles.end(); ++itr){    
+        //TerminateProcess(itr->second->hProcess, 0);  // not friendly to process, and does not kill child processes
+        //std::stringstream comStream;       
+        //comStream << "taskkill /pid ";
+        //comStream << itr->second->dwProcessId;
+        //comStream << " /t /f";  // to be more like TerminateProcess
+        //_MESSAGE("%s", comStream.str().c_str());             
+        //system(comStream.str().c_str());
+        stopProcess(itr->second->dwProcessId);
+
         CloseHandle(itr->second);
         delete (itr->second);
     }    
@@ -142,7 +189,17 @@ static void NetworkPipe_IsNewGameCallback(void * reserved)
 
     NewGameLoaded = true;
 
-	ResetData();
+    // resest data as needed
+}
+
+static void NetworkPipe_SaveCallback(void * reserved)
+{
+    return;
+}
+
+static void NetworkPipe_LoadCallback(void * reserved)
+{
+    return;
 }
 
 /**********************
@@ -496,20 +553,22 @@ bool Cmd_NetworkPipe_KillClient_Execute(COMMAND_ARGS){
             LPPROCESS_INFORMATION processInfo = processHandles[pid];
             processHandles.erase(pid);                
 
-            // kill the process, close the handle, and delete the memory holding the process info
-            TerminateProcess(processInfo->hProcess, 0);
+            // kill the process, close the handle, and delete the memory holding the process info            
+            //TerminateProcess(processInfo->hProcess, 0);  // not friendly to process, and does not kill child processes            
+            //std::stringstream comStream;       
+            //comStream << "taskkill /pid ";
+            //comStream << processInfo->dwProcessId;
+            //comStream << " /t /f";  // to be more like TerminateProcess
+            //_MESSAGE("%s", comStream.str().c_str());             
+            //system(comStream.str().c_str());
+
+            stopProcess(processInfo->dwProcessId);
+
             CloseHandle(processInfo);
             SAFE_DELETE(processInfo);
         }
     }   
 
-    return true;
-}
-
-// get client list
-bool Cmd_NetworkPipe_GetClients_Execute(COMMAND_ARGS)
-{
-    
     return true;
 }
 
@@ -641,7 +700,6 @@ DEFINE_COMMAND_PLUGIN(NetworkPipe_IsNewGame, "checks status of a new game being 
 
 DEFINE_COMMAND_PLUGIN(NetworkPipe_CreateClient, "creates client program", 0, 2, kParams_NetworkPipe_CreateClient);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_KillClient, "kills client program", 0, 1, kParams_NetworkPipe_KillClient);
-DEFINE_COMMAND_PLUGIN(NetworkPipe_GetClients, "returns client program list", 0, 0, NULL);
 
 DEFINE_COMMAND_PLUGIN(NetworkPipe_SetData, "stores data", 0, 1, kParams_NetworkPipe_SetData);
 DEFINE_COMMAND_PLUGIN(NetworkPipe_GetData, "retrieves data", 0, 1, kParams_NetworkPipe_GetData);
@@ -763,19 +821,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	g_Interface = obse;
 
-	g_pluginHandle = obse->GetPluginHandle();
-
-	/***************************************************************************
-	 *	
-	 *	READ THIS!
-	 *	
-	 *	Before releasing your plugin, you need to request an opcode range from
-	 *	the OBSE team and set it in your first SetOpcodeBase call. If you do not
-	 *	do this, your plugin will create major compatibility issues with other
-	 *	plugins, and may not load in future versions of OBSE. See
-	 *	obse_readme.txt for more information.
-	 *	
-	 **************************************************************************/
+	g_pluginHandle = obse->GetPluginHandle();	
 
 	// register commands
     // 0x2000 is for testing only
@@ -791,7 +837,7 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_IsNewGame);
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_CreateClient);
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_KillClient);
-    obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_GetClients,kRetnType_Array);
+    
     obse->RegisterCommand(&kCommandInfo_NetworkPipe_SetData);
     obse->RegisterTypedCommand(&kCommandInfo_NetworkPipe_GetData,kRetnType_Array);
 
@@ -812,8 +858,8 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 	{
 		// NOTE: SERIALIZATION DOES NOT WORK USING THE DEFAULT OPCODE BASE IN RELEASE BUILDS OF OBSE
 		// it works in debug builds
-		g_serialization->SetSaveCallback(g_pluginHandle, ExamplePlugin_SaveCallback);
-		g_serialization->SetLoadCallback(g_pluginHandle, ExamplePlugin_LoadCallback);
+		g_serialization->SetSaveCallback(g_pluginHandle, NetworkPipe_SaveCallback);
+		g_serialization->SetLoadCallback(g_pluginHandle, NetworkPipe_LoadCallback);
 		g_serialization->SetNewGameCallback(g_pluginHandle, NetworkPipe_IsNewGameCallback);
 #if 0	// enable below to test Preload callback, don't use unless you actually need it
 		g_serialization->SetPreloadCallback(g_pluginHandle, ExamplePlugin_PreloadCallback);

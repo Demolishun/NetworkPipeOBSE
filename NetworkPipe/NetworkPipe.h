@@ -84,7 +84,8 @@ class udp_server
 public:
 	udp_server(boost::asio::io_service& io_service, short port)
 		: io_service_(io_service),
-		  socket_(io_service_, udp::endpoint(boost::asio::ip::address_v4::from_string(current_address), port))//, // udp::v4()  
+		  //socket_(io_service_, udp::endpoint(boost::asio::ip::address_v4::from_string(current_address), port))//, // udp::v4()  
+          socket_(io_service_, udp::endpoint(udp::v4(), port))//, // udp::v4()  
 	{
         // start udp receive
 		socket_.async_receive_from(
