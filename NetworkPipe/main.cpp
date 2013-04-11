@@ -96,7 +96,27 @@ void stopProcess(DWORD pid)
     //system(comStream.str().c_str()); // works, but pops up a window momentarilly when called        
     
     //LPSTR s = const_cast<char *>(comStream.str().c_str());  
-    LPSTR cString = strdup( comStream.str().c_str() );
+    LPSTR cString = _strdup( comStream.str().c_str() );
+    if(!CreateProcess(NULL,cString,NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
+        _MESSAGE("Could not launch '%s'",cString);
+        SAFE_DELETE(processInfo);
+    }else{
+        // clean up
+        CloseHandle(processInfo);
+        SAFE_DELETE(processInfo);
+    }
+    // clean up 
+    free(cString);
+
+    // call pskill too
+    comStream.str("");
+    comStream.clear();  // clears any eof states
+
+    comStream << "pskill ";
+    comStream << pid;
+    _MESSAGE("%s", comStream.str().c_str());
+
+    cString = _strdup( comStream.str().c_str() );
     if(!CreateProcess(NULL,cString,NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
         _MESSAGE("Could not launch '%s'",cString);
         SAFE_DELETE(processInfo);
