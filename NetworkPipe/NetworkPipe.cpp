@@ -103,11 +103,12 @@ void udp_server::handle_send_timer(){
         unsigned short port;        
         convert >> port;
 
-        Console_Print("host:%s, port:%s, data:%s, portN:%d, len:%d",
+        /*Console_Print("host:%s, port:%s, data:%s, portN:%d, len:%d, ulong:%d",
             temp_host.c_str(),
             temp_port.c_str(),
             temp_data.c_str(),
-            port, temp_data.size());
+            port, temp_data.size(),
+            boost::asio::ip::address_v4::from_string(temp_host.c_str()).to_ulong());*/
 
         udp_buffer temp_buffer;  
         // getting this warning even though I know this is safe enough
@@ -115,13 +116,25 @@ void udp_server::handle_send_timer(){
         #pragma warning( disable : 4996 )
         temp_data.copy(temp_buffer.c_array(), temp_data.size(), 0);
         #pragma warning( pop )    
-        
-        socket_.async_send_to(
-			boost::asio::buffer(temp_buffer, temp_data.size()), 
-            udp::endpoint(boost::asio::ip::address_v4::from_string(temp_host), port),			    
-			boost::bind(&udp_server::handle_send_to, this,
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred));                        
+
+        // if the address is not 0.0.0.0 then send to the specified client
+        if(boost::asio::ip::address_v4::from_string(temp_host.c_str()).to_ulong() != 0){        
+            socket_.async_send_to(
+			    boost::asio::buffer(temp_buffer, temp_data.size()), 
+                udp::endpoint(boost::asio::ip::address_v4::from_string(temp_host), port),			    
+			    boost::bind(&udp_server::handle_send_to, this,
+			    boost::asio::placeholders::error,
+			    boost::asio::placeholders::bytes_transferred));         
+        // if the address is 0.0.0.0 then broadcast to all known clients
+        }else{
+            for(std::vector<udp::endpoint>::iterator itr = clientList.begin(); itr != clientList.end(); ++itr){
+                socket_.async_send_to(
+			        boost::asio::buffer(temp_buffer, temp_data.size()), *itr,			    
+			        boost::bind(&udp_server::handle_send_to, this,
+			        boost::asio::placeholders::error,
+			        boost::asio::placeholders::bytes_transferred));
+            } 
+        }
     }
 
     // restart the timer
