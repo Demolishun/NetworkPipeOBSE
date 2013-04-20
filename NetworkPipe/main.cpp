@@ -92,7 +92,7 @@ void stopProcess(DWORD pid)
     comStream << "taskkill /pid ";
     comStream << pid;
     //comStream << " /t /f";  // to be more like TerminateProcess
-    _MESSAGE("%s", comStream.str().c_str());             
+    //_MESSAGE("%s", comStream.str().c_str());             
     //system(comStream.str().c_str()); // works, but pops up a window momentarilly when called        
     
     //LPSTR s = const_cast<char *>(comStream.str().c_str());  
@@ -114,7 +114,7 @@ void stopProcess(DWORD pid)
 
     comStream << "pskill ";
     comStream << pid;
-    _MESSAGE("%s", comStream.str().c_str());
+    //_MESSAGE("%s", comStream.str().c_str());
 
     cString = _strdup( comStream.str().c_str() );
     if(!CreateProcess(NULL,cString,NULL,NULL,false,NORMAL_PRIORITY_CLASS,NULL,NULL,&startupInfo,processInfo)){
@@ -134,7 +134,7 @@ Init routine
 */
 static void PluginInit_PostLoadCallback()
 {	
-	_MESSAGE("NetworkPipe: PluginInit_PostLoadCallback called");
+	//_MESSAGE("NetworkPipe: PluginInit_PostLoadCallback called");
     
 	if(!g_Interface->isEditor)
 	{
@@ -146,13 +146,13 @@ static void PluginInit_PostLoadCallback()
 	}
     else
 	{
-		_MESSAGE("NetworkPipe: Running in editor, not starting UDP");
+		//_MESSAGE("NetworkPipe: Running in editor, not starting UDP");
 	}    
 }
 
 static void NetworkPipe_Exit()
 {
-    _MESSAGE("NetworkPipe_Exit called");
+    //_MESSAGE("NetworkPipe_Exit called");
 
     // stop if we quit to desktop
 	NetworkPipeEnable = false;
@@ -200,7 +200,7 @@ static void NetworkPipe_ExitToMainMenu(void * reserved)
 
 static void NetworkPipe_IsNewGameCallback(void * reserved)
 {
-    _MESSAGE("NetworkPipe: New game callback");
+    //_MESSAGE("NetworkPipe: New game callback");
 
     // stop if we create a new game
 	NetworkPipeEnable = false;
@@ -751,19 +751,19 @@ void MessageHandler(OBSEMessagingInterface::Message* msg)
         //NetworkPipeEnable = false;
         IsGameLoaded = false;
 	case OBSEMessagingInterface::kMessage_SaveGame:
-		_MESSAGE("NetworkPipe received save/load message with file path %s", msg->data);
+		//_MESSAGE("NetworkPipe received save/load message with file path %s", msg->data);
 		break;
 	case OBSEMessagingInterface::kMessage_Precompile: 
 		{
 			ScriptBuffer* buffer = (ScriptBuffer*)msg->data;		
-			_MESSAGE("NetworkPipe received precompile message. Script Text:\n%s", buffer->scriptText);
+			//_MESSAGE("NetworkPipe received precompile message. Script Text:\n%s", buffer->scriptText);
 			break;
 		}
 	case OBSEMessagingInterface::kMessage_PreLoadGame:
-		_MESSAGE("NetworkPipe received pre-loadgame message with file path %s", msg->data);
+		//_MESSAGE("NetworkPipe received pre-loadgame message with file path %s", msg->data);
 		break;
 	case OBSEMessagingInterface::kMessage_ExitGame_Console:
-		_MESSAGE("NetworkPipe received quit game from console message");
+		//_MESSAGE("NetworkPipe received quit game from console message");
 		break;
     case OBSEMessagingInterface::kMessage_PostLoadGame:
         // enable form creation        
@@ -779,7 +779,7 @@ extern "C" {
 
 bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 {
-	_MESSAGE("query");
+	//_MESSAGE("query");
 
 	// fill out the info structure
 	info->infoVersion = PluginInfo::kInfoVersion;
@@ -837,7 +837,7 @@ bool OBSEPlugin_Query(const OBSEInterface * obse, PluginInfo * info)
 
 bool OBSEPlugin_Load(const OBSEInterface * obse)
 {
-	_MESSAGE("load");
+	//_MESSAGE("load");
 
 	g_Interface = obse;
 
